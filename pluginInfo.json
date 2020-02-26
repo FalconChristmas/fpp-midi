@@ -1,0 +1,19 @@
+{
+	"repoName": "fpp-midi",
+	"name": "FPP MIDI",
+	"author": "Daniel Kulp",
+	"description": "Listener for MIDI messages to trigger FPP Commands",
+	"homeURL": "https://github.com/FalconChristmas/fpp-midi",
+	"srcURL": "https://github.com/FalconChristmas/fpp-midi.git",
+	"bugURL": "https://github.com/FalconChristmas/fpp-midi/issues",
+	"versions": [
+        {
+            "minFPPVersion": "4.0",
+            "maxFPPVersion": "0",
+            "branch": "master",
+            "sha": "",
+            "allowUpdates": 1
+        }
+	]
+}
+
