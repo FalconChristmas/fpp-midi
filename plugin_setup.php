@@ -156,7 +156,9 @@ function PrintCommandArgsForMIDI(tblCommand, configAdjustable, args) {
 function AddOption(value, text, current) {
     var o = "<option value='" + value + "'";
 
-    if (value == current)
+    var realVal = $('<textarea />').html(value).text();
+    
+    if (value == current || realVal == current)
         o += " selected";
 
     o += ">" + text + "</option>";
