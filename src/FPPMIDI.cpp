@@ -24,9 +24,7 @@
 #include "settings.h"
 #include "Plugin.h"
 #include "log.h"
-
-#include "tinyexpr.h"
-
+#include "util/ExpressionProcessor.cpp"
 
 class MIDIInputEvent {
 public:
@@ -94,15 +92,26 @@ public:
     MIDICommandArg(const std::string &t) : arg(t) {
     }
     ~MIDICommandArg() {
+        if (processor) {
+            delete processor;
+        }
     }
     
     std::string arg;
     std::string type;
-
-    te_expr *expr = nullptr;
+    
+    ExpressionProcessor *processor = nullptr;
+    
+    std::string evaluate(const std::string &tp) {
+        if (processor) {
+            std::string s = processor->evaluate(tp);
+            return s;
+        }
+        return "";
+    }
 };
 
-static const char *vNames[] = {"b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9"};
+static std::string vNames[] = {"b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9"};
 
 class MIDIEvent {
 public:
@@ -122,6 +131,26 @@ public:
                 args[x].type = v["argTypes"][x].asString();
             }
         }
+        for (auto &a : args) {
+            a.processor = new ExpressionProcessor();
+        }
+        for (int x = 0; x < 9; x++) {
+            ExpressionProcessor::ExpressionVariable *var = new ExpressionProcessor::ExpressionVariable(vNames[x]);
+            variables[x] = var;
+            for (auto &a : args) {
+                a.processor->bindVariable(var);
+            }
+        }
+        for (auto &a : args) {
+            a.processor->compile(a.arg);
+        }
+    }
+    ~MIDIEvent() {
+        conditions.clear();
+        args.clear();
+        for (int x = 0; x < 9; x++) {
+            delete variables[x];
+        }
     }
     
     bool matches(MIDIInputEvent &ev) {
@@ -134,51 +163,22 @@ public:
     }
     
     void invoke(MIDIInputEvent &ev) {
-        if (!exprEvaluated) {
-            for (int x = 0; x < 9; x++) {
-                exprVars[x].type = TE_VARIABLE;
-                exprVars[x].name = vNames[x];
-                exprVars[x].address = &varVals[x];
-                exprVars[x].context = nullptr;
-            }
-            for (auto &a : args) {
-                int err = 0;
-                a.expr = te_compile(a.arg.c_str(), &exprVars[0], 9, &err);
-                if (a.expr) {
-                    hasExpr = true;
-                }
-            }
-            exprEvaluated = true;
+        for (int x = 0; x < ev.params.size(); x++) {
+            variables[x]->setValue(std::to_string(ev.params[x]));
         }
-        if (hasExpr) {
-            for (int x = 0; x < ev.params.size(); x++) {
-                varVals[x] = ev.params[x];
-            }
-        }
-        
         std::vector<std::string> ar;
         for (auto &a : args) {
-            if (a.expr) {
-                double d = te_eval(a.expr);
-                if (a.type == "int") {
-                    int i = std::round(d);
-                    ar.push_back(std::to_string(i));
-                } else if (a.type == "bool") {
-                    ar.push_back(d != 0.0 ? "true" : "false");
-                } else {
-                    ar.push_back(std::to_string(d));
-                }
-            } else {
-                ar.push_back(a.arg);
+            std::string tp = "string";
+            if (a.type == "bool" || a.type == "int") {
+                tp = a.type;
             }
+            
+            //printf("Eval p: %s\n", a.arg.c_str());
+            std::string r = a.evaluate(tp);
+            //printf("        -> %s\n", r.c_str());
+            ar.push_back(r);
         }
 
-        if (WillLog(LOG_DEBUG, VB_PLUGIN)) {
-            LogDebug(VB_PLUGIN, "Command: %s\n", command.c_str());
-            for (auto &a : ar) {
-                LogDebug(VB_PLUGIN, "     %s\n", a.c_str());
-            }
-        }
         CommandManager::INSTANCE.run(command, ar);
     }
     
@@ -190,11 +190,7 @@ public:
     std::string command;
     std::vector<MIDICommandArg> args;
     
-        
-    bool exprEvaluated = false;
-    bool hasExpr = false;
-    std::array<double, 9> varVals;
-    std::array<te_variable, 9> exprVars;
+    std::array<ExpressionProcessor::ExpressionVariable*, 9> variables;
 };
 
 
@@ -203,7 +199,7 @@ public:
     int eventFile;
     std::vector<RtMidiIn *> midiin;
     
-    std::list<MIDIEvent> events;
+    std::list<MIDIEvent *> events;
     std::list<MIDIInputEvent> lastEvents;
     
     
@@ -225,7 +221,7 @@ public:
             bool success = reader.parse(buffer.str(), root);
             if (root.isMember("events")) {
                 for (int x = 0; x < root["events"].size(); x++) {
-                    events.push_back(MIDIEvent(root["events"][x]));
+                    events.push_back(new MIDIEvent(root["events"][x]));
                 }
             }
             if (root.isMember("ports")) {
@@ -267,6 +263,9 @@ public:
         for (auto a : midiin) {
             a->closePort();
             delete a;
+        }
+        for (auto e : events) {
+            delete e;
         }
         close(eventFile);
     }
@@ -310,8 +309,8 @@ public:
                 lastEvents.pop_front();
             }
             for (auto &a : events) {
-                if (a.matches(midi)) {
-                    a.invoke(midi);
+                if (a->matches(midi)) {
+                    a->invoke(midi);
                 }
             }
             lock.lock();

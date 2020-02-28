@@ -41,123 +41,10 @@ unset($output);
 <legend>MIDI Control Config</legend>
 
 <script>
-
-
-function PrintCommandArgsForMIDI(tblCommand, configAdjustable, args) {
-    var count = 1;
-    var initFuncs = [];
-    var haveTime = 0;
-    var haveDate = 0;
-    var children = [];
-
-//    $.each( args,
-    var valFunc = function( key, val ) {
-        if (val['type'] == 'args') {
-            return;
-        }
-
-        if ((val.hasOwnProperty('statusOnly')) &&
-            (val.statusOnly == true)) {
-            return;
-        }
-        var ID = tblCommand + "_arg_" + count;
-        var line = "<tr id='" + ID + "_row' class='arg_row_" + val['name'] + "'><td>";
-
-        if (children.includes(val['name']))
-            line += "&nbsp;&nbsp;&nbsp;&nbsp;&bull;&nbsp;";
-
-        var typeName = val['type'];
-        if (typeName == "datalist") {
-            typeName = "string";
-        }
-        line += val["description"] + " (" + typeName + "):</td><td>";
-
-        var dv = "";
-        if (typeof val['default'] != "undefined") {
-            dv = val['default'];
-        }
-        var contentListPostfix = "";
-        line += "<input class='arg_" + val['name'] + "' id='" + ID  + "' type='text' size='40' maxlength='200' data-midi-type='" + typeName + "' ";
-        if (val['type'] == "datalist" ||  (typeof val['contentListUrl'] != "undefined") || (typeof val['contents'] != "undefined")) {
-            line += " list='" + ID + "_list' value='" + dv + "'";
-        } else if (val['type'] == "bool") {
-            if (dv == "true" || dv == "1") {
-                line += " value='true'";
-            } else {
-                line += " value='false'";
-            }
-        } else if (val['type'] == "time") {
-            line += " value='00:00:00'";
-        } else if (val['type'] == "date") {
-            line += " value='2020-12-25'";
-        } else if ((val['type'] == "int") || (val['type'] == "float")) {
-            if (dv != "") {
-                line += " value='" + dv + "'";
-            } else if (typeof val['min'] != "undefined") {
-                line += " value='" + val['min'] + "'";
-            }
-        } else if (dv != "") {
-            line += " value='" + dv + "'";
-        }
-        line += ">";
-        if ((val['type'] == "int") || (val['type'] == "float")) {
-            if (typeof val['unit'] === 'string') {
-                line += ' ' + val['unit'];
-            }
-        }
-        line +="</input>";
-        if (val['type'] == "datalist" || (typeof val['contentListUrl'] != "undefined") || (typeof val['contents'] != "undefined")) {
-            line += "<datalist id='" + ID + "_list'>";
-            $.each(val['contents'], function( key, v ) {
-                   line += '<option value="' + v + '"';
-                   line += ">" + v + "</option>";
-                   });
-            line += "</datalist>";
-            contentListPostfix = "_list";
-        }
-
-        line += "</td></tr>";
-        $('#' + tblCommand).append(line);
-        if (typeof val['contentListUrl'] != "undefined") {
-            var selId = "#" + tblCommand + "_arg_" + count + contentListPostfix;
-            $.ajax({
-                   dataType: "json",
-                   url: val['contentListUrl'],
-                   async: false,
-                   success: function(data) {
-                       if (Array.isArray(data)) {
-                            data.sort();
-                            $.each( data, function( key, v ) {
-                              var line = '<option value="' + v + '"';
-                              if (v == dv) {
-                                line += " selected";
-                              }
-                              line += ">" + v + "</option>";
-                              $(selId).append(line);
-                            });
-                       } else {
-                            $.each( data, function( key, v ) {
-                                   var line = '<option value="' + key + '"';
-                                   if (key == dv) {
-                                        line += " selected";
-                                   }
-                                   line += ">" + v + "</option>";
-                                   $(selId).append(line);
-                            });
-                       }
-                   }
-                   });
-        }
-        count = count + 1;
-    };
-    $.each( args, valFunc);
-}
-
 function AddOption(value, text, current) {
     var o = "<option value='" + value + "'";
-
     var realVal = $('<textarea />').html(value).text();
-    
+
     if (value == current || realVal == current)
         o += " selected";
 
@@ -217,7 +104,7 @@ function AddMIDI() {
     html += "'><td class='colNumber rowNumber'>" + id + ".<td><input type='text' size='50' maxlength='50' class='desc'><span style='display: none;' class='uniqueId'>" + uniqueId + "</span></td>";
     html += "<td><table><tbody class='conditions'></tbody></table>";
     html += "</td><td><table class='fppTable' border=0 id='tableMIDICommand_" + uniqueId +"'>";
-    html += "<tr><td>Command:</td><td><select class='midicommand' id='midicommand" + uniqueId + "' onChange='CommandSelectChanged(\"midicommand" + uniqueId + "\", \"tableMIDICommand_" + uniqueId + "\" , false, PrintCommandArgsForMIDI);'><option value=''></option></select></td></tr>";
+    html += "<tr><td>Command:</td><td><select class='midicommand' id='midicommand" + uniqueId + "' onChange='CommandSelectChanged(\"midicommand" + uniqueId + "\", \"tableMIDICommand_" + uniqueId + "\" , false, PrintArgsInputsForEditable);'><option value=''></option></select></td></tr>";
     html += "</table></td></tr>";
     
     $("#midiEventTableBody").append(html);
@@ -279,7 +166,7 @@ function SaveEvent(row) {
         "description": desc,
         "conditions": conditions
     };
-    CommandToJSON('midicommand' + id, 'tableMIDICommand_' + id, json, "midi-type");
+    CommandToJSON('midicommand' + id, 'tableMIDICommand_' + id, json, true);
     return json;
 }
 
@@ -400,7 +287,7 @@ $.each(midiConfig["events"], function( key, val ) {
             val['conditions'][i]['conditionText']);
     }
     var id = parseInt($(row).find('.uniqueId').html());
-    PopulateExistingCommand(val, 'midicommand' + id, 'tableMIDICommand_' + id, false, PrintCommandArgsForMIDI);
+    PopulateExistingCommand(val, 'midicommand' + id, 'tableMIDICommand_' + id, false, PrintArgsInputsForEditable);
 });
 
 $.each(midiConfig["ports"], function( key, val ) {

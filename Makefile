@@ -5,7 +5,7 @@ all: libfpp-midi.so
 debug: all
 
 CFLAGS+=-I.
-OBJECTS_fpp_midi_so += src/FPPMIDI.o src/tinyexpr.o
+OBJECTS_fpp_midi_so += src/FPPMIDI.o
 LIBS_fpp_midi_so += -L/opt/fpp/src -lfpp -lrtmidi
 CXXFLAGS_src/FPPOSC.o += -I/opt/fpp/src
 
