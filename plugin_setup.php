@@ -75,6 +75,11 @@ function AddCondition(row, condition, compare, text) {
     c += AddOption('b3', 'Byte 3', condition);
     c += AddOption('b4', 'Byte 4', condition);
     c += AddOption('b5', 'Byte 5', condition);
+    c += AddOption('noteOn', 'Note On', condition);
+    c += AddOption('noteOff', 'Note Off', condition);
+    c += AddOption('channel', 'Channel', condition);
+    c += AddOption('control', 'Control Change', condition);
+    c += AddOption('pitch', 'Pitch Change', condition);
     c += "</select>";
 
     c += "<select class='conditionTypeSelect'>";
@@ -142,6 +147,7 @@ function SaveMIDIConfig(config) {
         success: function (data) {
         }
     });
+    SetRestartFlag(2);
 }
 
 function SaveEvent(row) {

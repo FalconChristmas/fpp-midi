@@ -9,9 +9,9 @@ For each Event added, the following fields need to be configured:
 <li>Conditions - these are conditions to filter in/out events based on the bytes in the message sent from the MIDI device.  For example, you could apply a condition to only respond to button down states insead of up and down.</li>
 <li>Command - the FPP Command to execute.
 <p>
-If the paramter starts with a single equal sign, it will be evaluated as a simple mathamatical formula.  For example, you can create a red color that is scaled from the pressure of the key press (usually byte 3, values 0-127) by using a formula like "=rgb(b3*2,0,0)".
+If the paramter starts with a single equal sign, it will be evaluated as a simple mathamatical formula.  For example, you can create a red color that is scaled from the velocity of the key press (usually byte 3, values 0-127) by using a formula like "=rgb(b3*2,0,0)".  You can also use variable names for the various parts of: "note" for the note (same as b2), "velocity" (same as b3), "channel" (lower 4 bits of b1), and pitch (b3 and b2, range -8192 to 8191).  For example, the formula above can be "=rgb(velocity*2,0,0)".
 <p>
-If the parameter does not start with a single =, it is treated as a string, but parameters can be sustituted in by using %%p1%% in the string.  For example: "Matrix-%%p1%%".
+If the parameter does not start with a single =, it is treated as a string, but parameters can be sustituted in by using %%b1%% in the string.  For example: "Matrix-%%b1%%".
 <p>
 
 

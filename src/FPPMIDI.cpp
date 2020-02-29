@@ -57,15 +57,43 @@ public:
     }
     
     bool matches(MIDIInputEvent &ev) {
-        int idx = conditionType[1] - '1';
-        if (idx >= ev.params.size()) {
-            return false;
+        int v = 0;
+        if (conditionType == "noteOn") {
+            if ((ev.params[0] & 0xF0) != 0x90) {
+                return false;
+            }
+            v = ev.params[1];
+        } else if (conditionType == "noteOff") {
+            if ((ev.params[0] & 0xF0) != 0x80) {
+                return false;
+            }
+            v = ev.params[1];
+        } else if (conditionType == "channel") {
+            v = ev.params[0] & 0xf;
+        } else if (conditionType == "control") {
+            if ((ev.params[0] & 0xF0) != 0xB0) {
+                return false;
+            }
+            v = ev.params[1];
+        } else if (conditionType == "pitch") {
+            if ((ev.params[0] & 0xF0) != 0xE0) {
+                return false;
+            }
+            v = ev.params[2];
+            v = v << 7; //7 bit numbers so only shift 7
+            v += ev.params[1];
+            v -= 0x2000; //range is -8192 - 8192
+        } else {
+            int idx = conditionType[1] - '1';
+            if (idx >= ev.params.size()) {
+                return false;
+            }
+            v = ev.params[idx];
         }
-        return compare(ev.params[idx]);
+        return compare(v);
     }
-    bool compare(unsigned char c) {
+    bool compare(int cv) {
         int tf = val;
-        int cv = c;
         if (compareType == "=") {
             return cv == tf;
         } else if (compareType == "!=") {
@@ -111,7 +139,11 @@ public:
     }
 };
 
-static std::string vNames[] = {"b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9"};
+static const int NUM_VARS = 9;
+static const std::string vNames[] = {
+    "b1", "b2", "b3", "b4", "b5",
+    "note", "channel", "pitch", "velocity"
+};
 
 class MIDIEvent {
 public:
@@ -134,7 +166,7 @@ public:
         for (auto &a : args) {
             a.processor = new ExpressionProcessor();
         }
-        for (int x = 0; x < 9; x++) {
+        for (int x = 0; x < NUM_VARS; x++) {
             ExpressionProcessor::ExpressionVariable *var = new ExpressionProcessor::ExpressionVariable(vNames[x]);
             variables[x] = var;
             for (auto &a : args) {
@@ -148,7 +180,7 @@ public:
     ~MIDIEvent() {
         conditions.clear();
         args.clear();
-        for (int x = 0; x < 9; x++) {
+        for (int x = 0; x < NUM_VARS; x++) {
             delete variables[x];
         }
     }
@@ -166,6 +198,15 @@ public:
         for (int x = 0; x < ev.params.size(); x++) {
             variables[x]->setValue(std::to_string(ev.params[x]));
         }
+        variables[5]->setValue(std::to_string(ev.params[1])); //note var
+        variables[8]->setValue(std::to_string(ev.params[2])); //velocity var
+        variables[6]->setValue(std::to_string(ev.params[0] & 0xF)); //channel
+        //pitch
+        int pitch = ev.params[2];
+        pitch = pitch << 7; //7 bit numbers so only shift 7
+        pitch += ev.params[1];
+        pitch -= 0x2000;
+        variables[7]->setValue(std::to_string(pitch));
         std::vector<std::string> ar;
         for (auto &a : args) {
             std::string tp = "string";
@@ -190,7 +231,7 @@ public:
     std::string command;
     std::vector<MIDICommandArg> args;
     
-    std::array<ExpressionProcessor::ExpressionVariable*, 9> variables;
+    std::array<ExpressionProcessor::ExpressionVariable*, 12> variables;
 };
 
 
