@@ -154,7 +154,13 @@ public:
             conditions.push_back(MIDICondition(v["conditions"][x]));
         }
 
-        command = v["command"].asString();
+        command = v;
+        command.removeMember("path");
+        command.removeMember("argTypes");
+        command.removeMember("args");
+        command.removeMember("conditions");
+        command.removeMember("description");
+
         for (int x = 0; x < v["args"].size(); x++) {
             args.push_back(MIDICommandArg(v["args"][x].asString()));
         }
@@ -207,7 +213,8 @@ public:
         pitch += ev.params[1];
         pitch -= 0x2000;
         variables[7]->setValue(std::to_string(pitch));
-        std::vector<std::string> ar;
+        
+        Json::Value newCommand = command;
         for (auto &a : args) {
             std::string tp = "string";
             if (a.type == "bool" || a.type == "int") {
@@ -217,10 +224,10 @@ public:
             //printf("Eval p: %s\n", a.arg.c_str());
             std::string r = a.evaluate(tp);
             //printf("        -> %s\n", r.c_str());
-            ar.push_back(r);
+            newCommand["args"].append(r);
         }
 
-        CommandManager::INSTANCE.run(command, ar);
+        CommandManager::INSTANCE.run(newCommand);
     }
     
     std::string path;
@@ -228,7 +235,7 @@ public:
     
     std::list<MIDICondition> conditions;
     
-    std::string command;
+    Json::Value command;
     std::vector<MIDICommandArg> args;
     
     std::array<ExpressionProcessor::ExpressionVariable*, 12> variables;

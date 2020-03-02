@@ -41,6 +41,8 @@ unset($output);
 <legend>MIDI Control Config</legend>
 
 <script>
+allowMultisyncCommands = true;
+
 function AddOption(value, text, current) {
     var o = "<option value='" + value + "'";
     var realVal = $('<textarea />').html(value).text();
