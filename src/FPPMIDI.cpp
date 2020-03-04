@@ -70,6 +70,8 @@ public:
             v = ev.params[1];
         } else if (conditionType == "channel") {
             v = ev.params[0] & 0xf;
+        } else if (conditionType == "velocity") {
+            v = ev.params[2];
         } else if (conditionType == "control") {
             if ((ev.params[0] & 0xF0) != 0xB0) {
                 return false;
