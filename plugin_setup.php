@@ -94,7 +94,7 @@ function AddCondition(row, condition, compare, text) {
     c += AddOption('&gt;=', '&gt;=', compare);
     c += "</select>";
 
-    c += "<input type='text' size='18' maxlength='30' class='conditionText' value='" + text + "'>";
+    c += "<input type='text' size='12' maxlength='30' class='conditionText' value='" + text + "'>";
 
     c += "</td></tr>";
 
@@ -274,8 +274,8 @@ $(document).ready(function() {
 </span>
 </div>
 
-<div class='genericTableWrapper'>
-<div class='genericTableContents'>
+<div class='fppTableWrapper'>
+<div class='fppTableContents'>
 <table class="fppTable" id="midiEventTable"  width='100%'>
 <thead><tr class="fppTableHeader"><th>#</th><th>Description</th><th>Conditions</th><th>Command</th></tr></thead>
 <tbody id='midiEventTableBody'>
