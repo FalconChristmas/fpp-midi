@@ -334,12 +334,12 @@ public:
         write(eventFile, &v, 8);
     }
 
-    virtual const httpserver::http_response render_GET(const httpserver::http_request &req) override {
+    virtual const std::shared_ptr<httpserver::http_response> render_GET(const httpserver::http_request &req) override {
         std::string v;
         for (auto &a : lastEvents) {
             v += a.toString() + "\n";
         }
-        return httpserver::http_response_builder(v, 200);
+        return std::shared_ptr<httpserver::http_response>(new httpserver::string_response(v, 200));
     }
     bool ProcessPacket(int i) {
         char buf[256];
