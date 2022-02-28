@@ -1,3 +1,5 @@
+#include <fpp-pch.h>
+
 #include <unistd.h>
 #include <ifaddrs.h>
 #include <errno.h>
@@ -10,8 +12,9 @@
 #include <vector>
 #include <sstream>
 #include <httpserver.hpp>
-#include <jsoncpp/json/json.h>
+#ifndef PLATFORM_OSX
 #include <sys/eventfd.h>
+#endif
 #include <cmath>
 #include <mutex>
 
@@ -246,7 +249,8 @@ public:
 
 class FPPMIDIPlugin : public FPPPlugin, public httpserver::http_resource {
 public:
-    int eventFile;
+    int eventFileWrite;
+    int eventFileRead;
     std::vector<RtMidiIn *> midiin;
     
     std::list<MIDIEvent *> events;
@@ -259,10 +263,20 @@ public:
     
     FPPMIDIPlugin() : FPPPlugin("fpp-midi") {
         LogInfo(VB_PLUGIN, "Initializing MIDI Plugin\n");
+#ifndef PLATFORM_OSX
+        eventFileRead = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+        eventFileWrite = eventFileRead;
+#else
+        int files[2];
+        pipe(files);
+        eventFileRead = files[0];
+        eventFileWrite = files[1];
+        fcntl(eventFileRead, F_SETFD, O_NONBLOCK);
+        fcntl(eventFileWrite, F_SETFD, O_NONBLOCK);
+#endif
         
-        eventFile = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-        if (FileExists("/home/fpp/media/config/plugin.fpp-midi.json")) {
-            std::ifstream t("/home/fpp/media/config/plugin.fpp-midi.json");
+        if (FileExists(FPP_DIR_CONFIG("/plugin.fpp-midi.json"))) {
+            std::ifstream t(FPP_DIR_CONFIG("/plugin.fpp-midi.json"));
             std::stringstream buffer;
             buffer << t.rdbuf();
             std::string config = buffer.str();
@@ -317,7 +331,10 @@ public:
         for (auto e : events) {
             delete e;
         }
-        close(eventFile);
+        close(eventFileRead);
+        if (eventFileRead != eventFileWrite) {
+            close(eventFileWrite);
+        }
     }
 
     static void midicallback(double deltatime, std::vector< unsigned char > *message, void *userData) {
@@ -331,7 +348,7 @@ public:
         MIDIInputEvent ev(*message);
         std::unique_lock<std::mutex> lock(queueLock);
         incoming.push_back(ev);
-        write(eventFile, &v, 8);
+        write(eventFileWrite, &v, 8);
     }
 
     virtual const std::shared_ptr<httpserver::http_response> render_GET(const httpserver::http_request &req) override {
@@ -343,9 +360,9 @@ public:
     }
     bool ProcessPacket(int i) {
         char buf[256];
-        ssize_t s = read(eventFile, buf, 256);
+        ssize_t s = read(eventFileRead, buf, 256);
         while (s > 0) {
-            s = read(eventFile, buf, 256);
+            s = read(eventFileRead, buf, 256);
         }
         std::unique_lock<std::mutex> lock(queueLock);
         LogExcess(VB_PLUGIN, "MIDI Process Packet : queue size %d\n", incoming.size());
@@ -370,8 +387,8 @@ public:
     void registerApis(httpserver::webserver *m_ws) override {
         m_ws->register_resource("/MIDI", this, true);
     }
-    virtual void addControlCallbacks(std::map<int, std::function<bool(int)>> &callbacks) {
-        callbacks[eventFile] = [this](int i) {
+    virtual void addControlCallbacks(std::map<int, std::function<bool(int)>> &callbacks) override {
+        callbacks[eventFileRead] = [this](int i) {
             return ProcessPacket(i);
         };
     }
