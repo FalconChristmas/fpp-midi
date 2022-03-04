@@ -32,7 +32,6 @@ $portsAvail = json_decode(file_get_contents("http://localhost/api/plugin-apis/MI
 
 
 <div id="global" class="settings">
-<fieldset>
 <legend>MIDI Control Config</legend>
 
 <script>
@@ -326,5 +325,4 @@ $.each(midiConfig["ports"], function( key, val ) {
 
 RefreshLastMessages();
 </script>
-</fieldset>
 </div>
