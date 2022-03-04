@@ -26,13 +26,8 @@ function convertAndGetSettings() {
 
 $pluginJson = convertAndGetSettings();
 
-exec("sudo aplaymidi -l | tail -n +2 | grep -v 'RtMidi'", $output, $return_val);
-$portsAvail = Array();
-foreach ($output as $value) {
-    $l = preg_split('/\s\s+/', $value);
-    $portsAvail[] = $l[1] . ":" . $l[2];
-}
-unset($output);
+$portsAvail = json_decode(file_get_contents("http://localhost/api/plugin-apis/MIDI/Devices"));
+
 ?>
 
 
@@ -109,7 +104,8 @@ function AddMIDI() {
     if (id % 2 != 0) {
         html += " oddRow'";
     }
-    html += "'><td class='colNumber rowNumber'>" + id + ".<td><input type='text' size='50' maxlength='50' class='desc'><span style='display: none;' class='uniqueId'>" + uniqueId + "</span></td>";
+    html += "'><td class='center' valign='middle'><div class='rowGrip'><i class='rowGripIcon fpp-icon-grip'></i></div></td>";
+    html += "<td><input type='text' size='30' maxlength='50' class='desc'><span style='display: none;' class='uniqueId'>" + uniqueId + "</span></td>";
     html += "<td><table><tbody class='conditions'></tbody></table>";
     html += "</td><td><table class='fppTable' border=0 id='tableMIDICommand_" + uniqueId +"'>";
     html += "<tr><td>Command:</td><td><select class='midicommand' id='midicommand" + uniqueId + "' onChange='CommandSelectChanged(\"midicommand" + uniqueId + "\", \"tableMIDICommand_" + uniqueId + "\" , false, PrintArgsInputsForEditable);'><option value=''></option></select></td></tr>";
@@ -130,7 +126,6 @@ function AddMIDI() {
 function RemoveMIDI() {
     if ($('#midiEventTableBody').find('.selectedEntry').length) {
         $('#midiEventTableBody').find('.selectedEntry').remove();
-        RenumberEvents();
     }
 
     DisableButtonClass('deleteEventButton');
@@ -215,23 +210,10 @@ function RefreshLastMessages() {
     );
 }
 
-function RenumberEvents() {
-    var id = 1;
-    $('#midiEventTableBody > tr').each(function() {
-        $(this).find('.rowNumber').html('' + id++ + '.');
-        $(this).removeClass('oddRow');
-
-        if (id % 2 != 0) {
-            $(this).addClass('oddRow');
-        }
-    });
-}
-
 $(document).ready(function() {
 
     $('#midiEventTableBody').sortable({
         update: function(event, ui) {
-            RenumberEvents();
         },
         item: '> tr',
         scroll: true
@@ -246,43 +228,74 @@ $(document).ready(function() {
 });
 
 </script>
-<div>
-<span style="float:right">
-<table border=0>
-<tr><td style='vertical-align: top;'>Last Messages:&nbsp;<input type="button" value="Refresh" class="buttons" onclick="RefreshLastMessages();"></td></tr><tr><td style='vertical-align: top;'><pre id="lastMessages" style='min-width:150px; margin:1px;min-height:300px;'></pre></td></tr>
-</table>
-</span>
-<span>
-<table border=0  class="fppTable">
-<thead>
-<tr class="fppTableHeader"><th>Enable</th><th>MIDI Device</th><th>SysEx</th><th>Time</th><th>Sense</th></tr>
-</thead>
-<tbody id='midiPortTableBody'>
-<? foreach ($portsAvail as $port) { ?>
-    <tr><td><input type="checkbox" class="enabled"></td><td class="port"><?= $port; ?></td><td><input type="checkbox" class="sysEx"></td><td><input type="checkbox" class="timeCode"></td><td><input type="checkbox" class="sense"></td></tr>
-<? } ?>
-</tbody>
-<tfoot>
-<tr><td colspan='5'>
-        <input type="button" value="Save" class="buttons genericButton" onclick="SaveMIDI();">
-        <input type="button" value="Add" class="buttons genericButton" onclick="AddCondition(AddMIDI(), 'ALWAYS', '', '');">
-        <input id="delButton" type="button" value="Delete" class="deleteEventButton disableButtons genericButton" onclick="RemoveMIDI();">
-    </td>
-</tr>
-</tfoot>
-</table>
-</span>
+
+
+<div class="row">
+    <div class="col-auto mr-auto">
+        <div class="row">
+            <div class="col-auto">
+                <div class="fppTableWrapper fppTableWrapperAsTable">
+                <div class="fppTableContents" role="region">
+                <table class="fppSelectableRowTable">
+                    <thead>
+                        <tr>
+                            <th style="min-width:60px">Enable</th>
+                            <th style="padding-right: 15px;">MIDI Device</th>
+                            <th style="min-width:60px">SysEx</th>
+                            <th style="min-width:60px">Time</th><th>Sense</th>
+                        </tr>
+                    </thead>
+                    <tbody id='midiPortTableBody'>
+                        <? foreach ($portsAvail as $port) { ?>
+                        <tr><td><input type="checkbox" class="enabled"></td>
+                            <td class="port" style="padding-right: 15px;"><?= $port; ?></td>
+                            <td><input type="checkbox" class="sysEx"></td>
+                            <td><input type="checkbox" class="timeCode"></td>
+                            <td><input type="checkbox" class="sense"></td></tr>
+                        <? } ?>
+                    </tbody>
+                </table>
+                </div>
+                </div>
+            </div>
+        </div>
+        <div classs="row">
+            <div class="col-auto">
+                <input type="button" value="Save" class="buttons genericButton" onclick="SaveMIDI();">
+                <input type="button" value="Add" class="buttons genericButton" onclick="AddCondition(AddMIDI(), 'ALWAYS', '', '');">
+                <input id="delButton" type="button" value="Delete" class="deleteEventButton disableButtons genericButton" onclick="RemoveMIDI();">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-auto">
+                <div class='fppTableWrapper'>
+                    <div class='fppTableContents'>
+                        <table  class="fppSelectableRowTable" id="midiEventTable"  width='100%'>
+                            <thead><tr class="fppTableHeader"><th>#</th><th>Description</th><th>Conditions</th><th>Command</th></tr></thead>
+                            <tbody id='midiEventTableBody' class="ui-sortable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div
+    <div class="col-auto">
+        <div>
+            <div class="row">
+                <div class="col">
+                    Last Messages:&nbsp;<input type="button" value="Refresh" class="buttons" onclick="RefreshLastMessages();">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <pre id="lastMessages" style='min-width:150px; margin:1px;min-height:300px;'></pre>
+                </div>
+            </div>
+        <div>
+    </div>
 </div>
 
-<div class='fppTableWrapper'>
-<div class='fppTableContents'>
-<table class="fppTable" id="midiEventTable"  width='100%'>
-<thead><tr class="fppTableHeader"><th>#</th><th>Description</th><th>Conditions</th><th>Command</th></tr></thead>
-<tbody id='midiEventTableBody'>
-</tbody>
-</table>
-</div>
-</div>
+
 
 <script>
 $.each(midiConfig["events"], function( key, val ) {

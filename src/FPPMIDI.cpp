@@ -348,15 +348,43 @@ public:
 
     virtual const std::shared_ptr<httpserver::http_response> render_GET(const httpserver::http_request &req) override {
         std::string v;
-        for (auto &a : lastEvents) {
-            v += a.toString() + "\n";
+        
+        if (req.get_path_pieces().size() > 1) {
+            std::string p1 = req.get_path_pieces()[1];
+            if (p1 == "Last") {
+                for (auto &a : lastEvents) {
+                    v += a.toString() + "\n";
+                }
+                return std::shared_ptr<httpserver::http_response>(new httpserver::string_response(v, 200));
+            } else if (p1 == "Devices") {
+                try {
+                    v = "[";
+                    RtMidiIn *mi = new RtMidiIn();
+                    if (mi != nullptr) {
+                        unsigned int nPorts = mi->getPortCount();
+                        for (int x = 0; x < nPorts; x++) {
+                            std::string portName = mi->getPortName(x);
+                            if (v.size() != 1) {
+                                v += ", ";
+                            }
+                            v += "\"" + portName + "\"";
+                        }
+                        delete mi;
+                    }
+                    v += "]";
+                    return std::shared_ptr<httpserver::http_response>(new httpserver::string_response(v, 200, "application/json"));
+                } catch (...) {
+                    LogErr(VB_PLUGIN, "Could not initialize MIDI plugin for port %s\n", name.c_str());
+                }
+            }
         }
-        return std::shared_ptr<httpserver::http_response>(new httpserver::string_response(v, 200));
+        return std::shared_ptr<httpserver::http_response>(new httpserver::string_response("Not Found", 404));
     }
     bool ProcessPacket(int i) {
         char buf[256];
         ssize_t s = read(eventFileRead, buf, 256);
         while (s > 0) {
+            fcntl(eventFileRead, F_SETFL, O_NONBLOCK);
             s = read(eventFileRead, buf, 256);
         }
         std::unique_lock<std::mutex> lock(queueLock);
