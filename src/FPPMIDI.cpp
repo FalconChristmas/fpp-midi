@@ -276,13 +276,8 @@ public:
 #endif
         
         if (FileExists(FPP_DIR_CONFIG("/plugin.fpp-midi.json"))) {
-            std::ifstream t(FPP_DIR_CONFIG("/plugin.fpp-midi.json"));
-            std::stringstream buffer;
-            buffer << t.rdbuf();
-            std::string config = buffer.str();
             Json::Value root;
-            Json::Reader reader;
-            bool success = reader.parse(buffer.str(), root);
+            bool success =  LoadJsonFromFile(FPP_DIR_CONFIG("/plugin.fpp-midi.json"), root);
             if (root.isMember("events")) {
                 for (int x = 0; x < root["events"].size(); x++) {
                     events.push_back(new MIDIEvent(root["events"][x]));
