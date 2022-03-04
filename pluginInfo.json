@@ -11,13 +11,13 @@
             "minFPPVersion": "4.0",
             "maxFPPVersion": "5.99",
             "branch": "master",
-            "sha": ""
+            "sha": "0726df4963d7d334cb3750c325b46f83a926c2c8"
         },
         {
             "minFPPVersion": "6.0",
             "maxFPPVersion": "0",
             "branch": "master",
-            "sha": "0726df4963d7d334cb3750c325b46f83a926c2c8",
+            "sha": "",
             "allowUpdates": 1
         }
 	]
