@@ -229,32 +229,33 @@ $(document).ready(function() {
 </script>
 
 
+
 <div class="row">
     <div class="col-auto mr-auto">
         <div class="row">
             <div class="col-auto">
                 <div class="fppTableWrapper fppTableWrapperAsTable">
-                <div class="fppTableContents" role="region">
-                <table class="fppSelectableRowTable">
-                    <thead>
-                        <tr>
-                            <th style="min-width:60px">Enable</th>
-                            <th style="padding-right: 15px;">MIDI Device</th>
-                            <th style="min-width:60px">SysEx</th>
-                            <th style="min-width:60px">Time</th><th>Sense</th>
-                        </tr>
-                    </thead>
-                    <tbody id='midiPortTableBody'>
-                        <? foreach ($portsAvail as $port) { ?>
-                        <tr><td><input type="checkbox" class="enabled"></td>
-                            <td class="port" style="padding-right: 15px;"><?= $port; ?></td>
-                            <td><input type="checkbox" class="sysEx"></td>
-                            <td><input type="checkbox" class="timeCode"></td>
-                            <td><input type="checkbox" class="sense"></td></tr>
-                        <? } ?>
-                    </tbody>
-                </table>
-                </div>
+                    <div class="fppTableContents" role="region">
+                        <table class="fppSelectableRowTable">
+                            <thead>
+                                <tr>
+                                    <th style="min-width:60px">Enable</th>
+                                    <th style="padding-right: 15px;">MIDI Device</th>
+                                    <th style="min-width:60px">SysEx</th>
+                                    <th style="min-width:60px">Time</th><th>Sense</th>
+                                </tr>
+                            </thead>
+                            <tbody id='midiPortTableBody'>
+                                <? foreach ($portsAvail as $port) { ?>
+                                <tr><td><input type="checkbox" class="enabled"></td>
+                                    <td class="port" style="padding-right: 15px;"><?= $port; ?></td>
+                                    <td><input type="checkbox" class="sysEx"></td>
+                                    <td><input type="checkbox" class="timeCode"></td>
+                                    <td><input type="checkbox" class="sense"></td></tr>
+                                <? } ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -277,7 +278,7 @@ $(document).ready(function() {
                 </div>
             </div>
         </div>
-    </div
+    </div>
     <div class="col-auto">
         <div>
             <div class="row">
@@ -290,7 +291,7 @@ $(document).ready(function() {
                     <pre id="lastMessages" style='min-width:150px; margin:1px;min-height:300px;'></pre>
                 </div>
             </div>
-        <div>
+        </div>
     </div>
 </div>
 
@@ -326,3 +327,4 @@ $.each(midiConfig["ports"], function( key, val ) {
 RefreshLastMessages();
 </script>
 </div>
+

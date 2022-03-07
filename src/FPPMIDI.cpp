@@ -56,7 +56,11 @@ public:
         conditionType = v["condition"].asString();
         compareType = v["conditionCompare"].asString();
         std::string text = v["conditionText"].asString();
-        val = std::stoi(text, nullptr, 0);
+        if (text != "") {
+            val = std::stoi(text, nullptr, 0);
+        } else {
+            val = 0;
+        }
     }
     
     bool matches(MIDIInputEvent &ev) {
@@ -166,8 +170,10 @@ public:
         command.removeMember("conditions");
         command.removeMember("description");
 
-        for (int x = 0; x < v["args"].size(); x++) {
-            args.push_back(MIDICommandArg(v["args"][x].asString()));
+        if (v.isMember("args")) {
+            for (int x = 0; x < v["args"].size(); x++) {
+                args.push_back(MIDICommandArg(v["args"][x].asString()));
+            }
         }
         if (v.isMember("argTypes")) {
             for (int x = 0; x < v["argTypes"].size(); x++) {
