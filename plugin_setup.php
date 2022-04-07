@@ -61,9 +61,9 @@ function AddCondition(row, condition, compare, text) {
     var c = "<tr>";
 
     if (rows == 0)
-        c += "<td><a href='#' class='addButton' onClick='AddCondition($(this).parent().parent().parent().parent(), \"ALWAYS\", \"\", \"\");'></a></td>";
+        c += "<td><button class='circularButton circularButton-vsm circularButton-sm circularButton-visible circularAddButton' onClick='AddCondition($(this).parent().parent().parent().parent(), \"ALWAYS\", \"\", \"\");'>Add</button></td>";
     else
-        c += "<td><a href='#' class='deleteButton' onClick='RemoveCondition($(this).parent().parent());'></a></td>";
+        c += "<td><button class='circularButton circularButton-vsm circularButton-sm circularButton-visible circularDeleteButton' onClick='RemoveCondition($(this).parent().parent());'>Delete</button></td>";
 
     c += "<td><select class='conditionSelect'>";
     c += AddOption('b1', 'Byte 1', condition);
