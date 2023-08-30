@@ -1,6 +1,6 @@
 #!/bin/sh
 
-echo "Running fpp-osc PreStart Script"
+echo "Running fpp-midi PreStart Script"
 
 BASEDIR=$(dirname $0)
 cd $BASEDIR
