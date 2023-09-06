@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# fpp-osc install script
+# fpp-midi install script
 
 BASEDIR=$(dirname $0)
 cd $BASEDIR

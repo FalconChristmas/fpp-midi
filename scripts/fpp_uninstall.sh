@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# fpp-osc uninstall script
-echo "Running fpp-osc uninstall Script"
+# fpp-midi uninstall script
+echo "Running fpp-midi uninstall Script"
 
 BASEDIR=$(dirname $0)
 cd $BASEDIR
