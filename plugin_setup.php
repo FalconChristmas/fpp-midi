@@ -135,7 +135,7 @@ function SaveMIDIConfig(config) {
     var data = JSON.stringify(config);
     $.ajax({
         type: "POST",
-        url: 'fppjson.php?command=setPluginJSON&plugin=fpp-midi',
+        url: 'api/configfile/plugin.fpp-midi.json',
         dataType: 'json',
         async: false,
         data: data,
