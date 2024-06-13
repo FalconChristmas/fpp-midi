@@ -352,19 +352,18 @@ public:
         write(eventFileWrite, &v, 8);
     }
 
-    virtual const std::shared_ptr<httpserver::http_response> render_GET(const httpserver::http_request &req) override {
-        std::string v;
-        
+    virtual HTTP_RESPONSE_CONST std::shared_ptr<httpserver::http_response> render_GET(const httpserver::http_request &req) override {
         if (req.get_path_pieces().size() > 1) {
             std::string p1 = req.get_path_pieces()[1];
             if (p1 == "Last") {
+                std::string v;
                 for (auto &a : lastEvents) {
                     v += a.toString() + "\n";
                 }
                 return std::shared_ptr<httpserver::http_response>(new httpserver::string_response(v, 200));
             } else if (p1 == "Devices") {
                 try {
-                    v = "[";
+                    std::string v = "[";
                     RtMidiIn *mi = new RtMidiIn();
                     if (mi != nullptr) {
                         unsigned int nPorts = mi->getPortCount();
