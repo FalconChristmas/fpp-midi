@@ -21,7 +21,7 @@ sed -i -e "s/Version\(.*\)+\(.*\)/Version\1~fpp/g" deb/DEBIAN/control
 
 if (( DEBVER < 11 )); then
 sed -i -e "s/Depends: \(.*\)/Depends: librtmidi4/g" deb/DEBIAN/control
-elif (( DEBVER < 11 )); then
+elif (( DEBVER < 12 )); then
 sed -i -e "s/Depends: \(.*\)/Depends: librtmidi5/g" deb/DEBIAN/control
 else 
 sed -i -e "s/Depends: \(.*\)/Depends: librtmidi6/g" deb/DEBIAN/control
