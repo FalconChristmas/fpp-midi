@@ -1,4 +1,5 @@
 #include <fpp-pch.h>
+#include <drogon/HttpAppFramework.h>
 
 #include <unistd.h>
 #include <ifaddrs.h>
@@ -11,23 +12,22 @@
 #include <list>
 #include <vector>
 #include <sstream>
-#include <httpserver.hpp>
 #ifndef PLATFORM_OSX
 #include <sys/eventfd.h>
 #endif
 #include <cmath>
 #include <mutex>
-
-
-#include <rtmidi/RtMidi.h>
-#include "FPPMIDI.h"
-
-#include "commands/Commands.h"
-#include "common.h"
-#include "settings.h"
 #include "Plugin.h"
+#include "commands/Commands.h"
+#include <rtmidi/RtMidi.h>
 #include "log.h"
 #include "util/ExpressionProcessor.cpp"
+
+// MIDI variable names for expression evaluation
+#define NUM_VARS 10
+const char* vNames[NUM_VARS] = {
+    "note", "velocity", "channel", "control", "pitch", "note_var", "channel_var", "unused1", "velocity_var", "unused2"
+};
 
 class MIDIInputEvent {
 public:
@@ -152,12 +152,6 @@ public:
     }
 };
 
-static const int NUM_VARS = 9;
-static const std::string vNames[] = {
-    "b1", "b2", "b3", "b4", "b5",
-    "note", "channel", "pitch", "velocity"
-};
-
 class MIDIEvent {
 public:
     MIDIEvent(Json::Value &v) {
@@ -257,20 +251,16 @@ public:
 };
 
 
-class FPPMIDIPlugin : public FPPPlugin, public httpserver::http_resource {
+class FPPMIDIPlugin : public FPPPlugin {
 public:
     int eventFileWrite;
     int eventFileRead;
     std::vector<RtMidiIn *> midiin;
-    
     std::list<MIDIEvent *> events;
     std::list<MIDIInputEvent> lastEvents;
-    
-    
     std::mutex queueLock;
     std::list<MIDIInputEvent> incoming;
-    
-    
+
     FPPMIDIPlugin() : FPPPlugin("fpp-midi") {
         LogInfo(VB_PLUGIN, "Initializing MIDI Plugin\n");
 #ifndef PLATFORM_OSX
@@ -284,7 +274,6 @@ public:
         fcntl(eventFileRead, F_SETFD, O_NONBLOCK);
         fcntl(eventFileWrite, F_SETFD, O_NONBLOCK);
 #endif
-        
         if (FileExists(FPP_DIR_CONFIG("/plugin.fpp-midi.json"))) {
             Json::Value root;
             bool success =  LoadJsonFromFile(FPP_DIR_CONFIG("/plugin.fpp-midi.json"), root);
@@ -305,11 +294,9 @@ public:
                                 if (portName.find(name) != std::string::npos) {
                                     mi->openPort(x);
                                     mi->setCallback(&midicallback, this);
-                                    
                                     bool enSysEx = root["ports"][x]["enableSysEx"].asBool();
                                     bool enTC = root["ports"][x]["enableTimeCode"].asBool();
                                     bool enSense = root["ports"][x]["enableSense"].asBool();
-                                    
                                     mi->ignoreTypes(!enSysEx, !enTC, !enSense);
                                     midiin.push_back(mi);
                                     mi = nullptr;
@@ -328,6 +315,7 @@ public:
             }
         }
     }
+
     virtual ~FPPMIDIPlugin() {
         for (auto a : midiin) {
             a->closePort();
@@ -356,15 +344,27 @@ public:
         write(eventFileWrite, &v, 8);
     }
 
-    virtual HTTP_RESPONSE_CONST std::shared_ptr<httpserver::http_response> render_GET(const httpserver::http_request &req) override {
-        if (req.get_path_pieces().size() > 1) {
-            std::string p1 = req.get_path_pieces()[1];
+    std::string getMidiPath(const HttpRequestPtr& req) {
+        std::vector<std::string> pieces = getPathPieces(req->path());
+        if (pieces.size() > 1 && pieces[0] == "MIDI") {
+            return pieces[1];
+        }
+        if (pieces.size() > 3 && pieces[0] == "api" && pieces[1] == "plugin-apis" && pieces[2] == "MIDI") {
+            return pieces[3];
+        }
+        return std::string();
+    }
+
+    void registerApis() override {
+        auto handleMidi = [this](const HttpRequestPtr& req,
+                                 std::function<void(const HttpResponsePtr&)>&& callback) {
+            std::string p1 = getMidiPath(req);
             if (p1 == "Last") {
                 std::string v;
                 for (auto &a : lastEvents) {
                     v += a.toString() + "\n";
                 }
-                return std::shared_ptr<httpserver::http_response>(new httpserver::string_response(v, 200));
+                callback(makeStringResponse(v, 200));
             } else if (p1 == "Devices") {
                 try {
                     std::string v = "[";
@@ -381,14 +381,22 @@ public:
                         delete mi;
                     }
                     v += "]";
-                    return std::shared_ptr<httpserver::http_response>(new httpserver::string_response(v, 200, "application/json"));
+                    callback(makeStringResponse(v, 200, "application/json"));
                 } catch (...) {
                     LogErr(VB_PLUGIN, "Could not initialize MIDI plugin for port %s\n", name.c_str());
+                    callback(makeStringResponse("Error", 500));
                 }
+            } else {
+                callback(makeStringResponse("Not Found", 404));
             }
-        }
-        return std::shared_ptr<httpserver::http_response>(new httpserver::string_response("Not Found", 404));
+        };
+
+        drogon::app().registerHandler("/MIDI/Last", handleMidi, {drogon::Get});
+        drogon::app().registerHandler("/MIDI/Devices", handleMidi, {drogon::Get});
+        drogon::app().registerHandler("/api/plugin-apis/MIDI/Last", handleMidi, {drogon::Get});
+        drogon::app().registerHandler("/api/plugin-apis/MIDI/Devices", handleMidi, {drogon::Get});
     }
+
     bool ProcessPacket(int i) {
         char buf[256];
         ssize_t s = read(eventFileRead, buf, 256);
@@ -401,7 +409,6 @@ public:
         while (!incoming.empty()) {
             auto midi = incoming.front();
             incoming.pop_front();
-            
             lock.unlock();
             lastEvents.push_back(midi);
             if (lastEvents.size() > 25) {
@@ -416,16 +423,7 @@ public:
         }
         return false;
     }
-    void registerApis(httpserver::webserver *m_ws) override {
-        m_ws->register_resource("/MIDI", this, true);
-    }
-    virtual void addControlCallbacks(std::map<int, std::function<bool(int)>> &callbacks) override {
-        callbacks[eventFileRead] = [this](int i) {
-            return ProcessPacket(i);
-        };
-    }
 };
-
 
 extern "C" {
     FPPPlugin *createPlugin() {
