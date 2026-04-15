@@ -7,7 +7,7 @@ debug: all
 
 CFLAGS+=-I.
 OBJECTS_fpp_midi_so += src/FPPMIDI.o
-LIBS_fpp_midi_so += -L$(SRCDIR) -lfpp -ljsoncpp -lhttpserver -lrtmidi
+LIBS_fpp_midi_so += -L$(SRCDIR) -lfpp -ljsoncpp -ldrogon -ltrantor -lrtmidi
 CXXFLAGS_src/FPPOSC.o += -I$(SRCDIR)
 
 

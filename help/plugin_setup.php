@@ -9,9 +9,21 @@ For each Event added, the following fields need to be configured:
 <li>Conditions - these are conditions to filter in/out events based on the bytes in the message sent from the MIDI device.  For example, you could apply a condition to only respond to button down states insead of up and down.</li>
 <li>Command - the FPP Command to execute.
 <p>
-If the paramter starts with a single equal sign, it will be evaluated as a simple mathamatical formula.  For example, you can create a red color that is scaled from the velocity of the key press (usually byte 3, values 0-127) by using a formula like "=rgb(b3*2,0,0)".  You can also use variable names for the various parts of: "note" for the note (same as b2), "velocity" (same as b3), "channel" (lower 4 bits of b1), and pitch (b3 and b2, range -8192 to 8191).  For example, the formula above can be "=rgb(velocity*2,0,0)".
+If the parameter starts with a single equal sign, it will be evaluated as a simple mathematical formula.  For example, you can create a red color that is scaled from the velocity of the key press (usually byte 3, values 0-127) by using a formula like "=rgb(b3*2,0,0)".  The following variables are available in expressions:
+<ul>
+    <li>b1, b2, b3, b4, b5 - first five bytes of the MIDI message (0 if not present)</li>
+    <li>note - same as b2</li>
+    <li>velocity - same as b3</li>
+    <li>channel - lower 4 bits of b1 (0-15)</li>
+    <li>pitch - combined from b3 and b2, range -8192 to 8191</li>
+    <li>control - same as b2</li>
+    <li>note_var - alias of note</li>
+    <li>channel_var - alias of channel</li>
+    <li>velocity_var - alias of velocity</li>
+</ul>
+For example, the formula above can be written as "=rgb(velocity*2,0,0)".
 <p>
-If the parameter does not start with a single =, it is treated as a string, but parameters can be sustituted in by using %%b1%% in the string.  For example: "Matrix-%%b1%%".
+If the parameter does not start with a single =, it is treated as a string, but parameters can be substituted in by using %%name%% in the string (for example %%b1%%, %%note%%, or %%velocity%%).  For example: "Matrix-%%b1%%".
 <p>
 
 

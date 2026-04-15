@@ -23,10 +23,28 @@
 #include "log.h"
 #include "util/ExpressionProcessor.cpp"
 
-// MIDI variable names for expression evaluation
-#define NUM_VARS 10
+// MIDI variable names for expression evaluation.
+// Keep legacy b1-b5 names for backward compatibility with existing plugin configs.
+#define NUM_VARS 13
+enum MIDIVarIndex {
+    VAR_B1 = 0,
+    VAR_B2,
+    VAR_B3,
+    VAR_B4,
+    VAR_B5,
+    VAR_NOTE,
+    VAR_CHANNEL,
+    VAR_PITCH,
+    VAR_VELOCITY,
+    VAR_NOTE_VAR,
+    VAR_CHANNEL_VAR,
+    VAR_VELOCITY_VAR,
+    VAR_CONTROL
+};
 const char* vNames[NUM_VARS] = {
-    "note", "velocity", "channel", "control", "pitch", "note_var", "channel_var", "unused1", "velocity_var", "unused2"
+    "b1", "b2", "b3", "b4", "b5",
+    "note", "channel", "pitch", "velocity",
+    "note_var", "channel_var", "velocity_var", "control"
 };
 
 class MIDIInputEvent {
@@ -49,6 +67,20 @@ public:
     std::vector<unsigned char> params;
 };
 
+namespace {
+
+std::string getMidiPath(const HttpRequestPtr& req) {
+    std::vector<std::string> pieces = getPathPieces(req->path());
+    if (pieces.size() > 1 && pieces[0] == "MIDI") {
+        return pieces[1];
+    }
+    if (pieces.size() > 3 && pieces[0] == "api" && pieces[1] == "plugin-apis" && pieces[2] == "MIDI") {
+        return pieces[3];
+    }
+    return std::string();
+}
+}
+
 
 class MIDICondition {
 public:
@@ -68,13 +100,23 @@ public:
     }
     
     bool matches(MIDIInputEvent &ev) {
+        if (ev.params.empty()) {
+            return false;
+        }
+
         int v = 0;
         if (conditionType == "noteOn") {
+            if (ev.params.size() < 2) {
+                return false;
+            }
             if ((ev.params[0] & 0xF0) != 0x90) {
                 return false;
             }
             v = ev.params[1];
         } else if (conditionType == "noteOff") {
+            if (ev.params.size() < 2) {
+                return false;
+            }
             if ((ev.params[0] & 0xF0) != 0x80) {
                 return false;
             }
@@ -82,13 +124,22 @@ public:
         } else if (conditionType == "channel") {
             v = ev.params[0] & 0xf;
         } else if (conditionType == "velocity") {
+            if (ev.params.size() < 3) {
+                return false;
+            }
             v = ev.params[2];
         } else if (conditionType == "control") {
+            if (ev.params.size() < 2) {
+                return false;
+            }
             if ((ev.params[0] & 0xF0) != 0xB0) {
                 return false;
             }
             v = ev.params[1];
         } else if (conditionType == "pitch") {
+            if (ev.params.size() < 3) {
+                return false;
+            }
             if ((ev.params[0] & 0xF0) != 0xE0) {
                 return false;
             }
@@ -97,8 +148,11 @@ public:
             v += ev.params[1];
             v -= 0x2000; //range is -8192 - 8192
         } else {
+            if (conditionType.size() < 2 || (conditionType[0] != 'p' && conditionType[0] != 'b')) {
+                return false;
+            }
             int idx = conditionType[1] - '1';
-            if (idx >= ev.params.size()) {
+            if (idx < 0 || static_cast<size_t>(idx) >= ev.params.size()) {
                 return false;
             }
             v = ev.params[idx];
@@ -174,7 +228,7 @@ public:
             }
         }
         if (v.isMember("argTypes")) {
-            for (int x = 0; x < v["argTypes"].size(); x++) {
+            for (int x = 0; x < v["argTypes"].size() && x < args.size(); x++) {
                 args[x].type = v["argTypes"][x].asString();
             }
         }
@@ -210,18 +264,41 @@ public:
     }
     
     void invoke(MIDIInputEvent &ev) {
-        for (int x = 0; x < ev.params.size(); x++) {
-            variables[x]->setValue(std::to_string(ev.params[x]));
-        }
-        variables[5]->setValue(std::to_string(ev.params[1])); //note var
-        variables[8]->setValue(std::to_string(ev.params[2])); //velocity var
-        variables[6]->setValue(std::to_string(ev.params[0] & 0xF)); //channel
-        //pitch
-        int pitch = ev.params[2];
+        auto paramOrZero = [&ev](size_t idx) {
+            return ev.params.size() > idx ? static_cast<int>(ev.params[idx]) : 0;
+        };
+
+        int b1 = paramOrZero(0);
+        int b2 = paramOrZero(1);
+        int b3 = paramOrZero(2);
+        int b4 = paramOrZero(3);
+        int b5 = paramOrZero(4);
+
+        int note = b2;
+        int velocity = b3;
+        int channel = b1 & 0xF;
+
+        // pitch from MIDI LSB/MSB pair, centered around 0.
+        int pitch = velocity;
         pitch = pitch << 7; //7 bit numbers so only shift 7
-        pitch += ev.params[1];
+        pitch += note;
         pitch -= 0x2000;
-        variables[7]->setValue(std::to_string(pitch));
+
+        variables[VAR_B1]->setValue(std::to_string(b1));
+        variables[VAR_B2]->setValue(std::to_string(b2));
+        variables[VAR_B3]->setValue(std::to_string(b3));
+        variables[VAR_B4]->setValue(std::to_string(b4));
+        variables[VAR_B5]->setValue(std::to_string(b5));
+        variables[VAR_NOTE]->setValue(std::to_string(note));
+        variables[VAR_CHANNEL]->setValue(std::to_string(channel));
+        variables[VAR_PITCH]->setValue(std::to_string(pitch));
+        variables[VAR_VELOCITY]->setValue(std::to_string(velocity));
+
+        // Keep newer alias names in sync.
+        variables[VAR_NOTE_VAR]->setValue(std::to_string(note));
+        variables[VAR_CHANNEL_VAR]->setValue(std::to_string(channel));
+        variables[VAR_VELOCITY_VAR]->setValue(std::to_string(velocity));
+        variables[VAR_CONTROL]->setValue(std::to_string(b2));
         
         Json::Value newCommand = command;
         for (auto &a : args) {
@@ -247,21 +324,24 @@ public:
     Json::Value command;
     std::vector<MIDICommandArg> args;
     
-    std::array<ExpressionProcessor::ExpressionVariable*, 12> variables;
+    std::array<ExpressionProcessor::ExpressionVariable*, NUM_VARS> variables;
 };
 
 
-class FPPMIDIPlugin : public FPPPlugin {
+class FPPMIDIPlugin : public FPPPlugins::Plugin, public FPPPlugins::APIProviderPlugin {
 public:
     int eventFileWrite;
     int eventFileRead;
     std::vector<RtMidiIn *> midiin;
     std::list<MIDIEvent *> events;
-    std::list<MIDIInputEvent> lastEvents;
     std::mutex queueLock;
     std::list<MIDIInputEvent> incoming;
 
-    FPPMIDIPlugin() : FPPPlugin("fpp-midi") {
+    std::mutex lastEventsLock;
+    std::list<MIDIInputEvent> lastEvents;
+
+
+    FPPMIDIPlugin() : FPPPlugins::Plugin("fpp-midi"), FPPPlugins::APIProviderPlugin() {
         LogInfo(VB_PLUGIN, "Initializing MIDI Plugin\n");
 #ifndef PLATFORM_OSX
         eventFileRead = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
@@ -344,57 +424,56 @@ public:
         write(eventFileWrite, &v, 8);
     }
 
-    std::string getMidiPath(const HttpRequestPtr& req) {
-        std::vector<std::string> pieces = getPathPieces(req->path());
-        if (pieces.size() > 1 && pieces[0] == "MIDI") {
-            return pieces[1];
+    
+
+    void handleMidi(const HttpRequestPtr& req,
+                    std::function<void(const HttpResponsePtr&)>&& callback) {
+        std::string p1 = getMidiPath(req);
+        if (p1 == "Last") {
+            std::string v;
+            std::unique_lock<std::mutex> lock(lastEventsLock);
+            for (auto &a : lastEvents) {
+                v += a.toString() + "\n";
+            }
+            callback(makeStringResponse(v, 200));
+        } else if (p1 == "Devices") {
+            try {
+                std::string v = "[";
+                RtMidiIn *mi = new RtMidiIn();
+                if (mi != nullptr) {
+                    unsigned int nPorts = mi->getPortCount();
+                    for (int x = 0; x < nPorts; x++) {
+                        std::string portName = mi->getPortName(x);
+                        if (v.size() != 1) {
+                            v += ", ";
+                        }
+                        v += "\"" + portName + "\"";
+                    }
+                    delete mi;
+                }
+                v += "]";
+                callback(makeStringResponse(v, 200, "application/json"));
+            } catch (...) {
+                LogErr(VB_PLUGIN, "Could not enumerate MIDI ports\n");
+                callback(makeStringResponse("Error", 500));
+            }
+        } else {
+            callback(makeStringResponse("Not Found", 404));
         }
-        if (pieces.size() > 3 && pieces[0] == "api" && pieces[1] == "plugin-apis" && pieces[2] == "MIDI") {
-            return pieces[3];
-        }
-        return std::string();
     }
 
-    void registerApis() override {
-        auto handleMidi = [this](const HttpRequestPtr& req,
-                                 std::function<void(const HttpResponsePtr&)>&& callback) {
-            std::string p1 = getMidiPath(req);
-            if (p1 == "Last") {
-                std::string v;
-                for (auto &a : lastEvents) {
-                    v += a.toString() + "\n";
-                }
-                callback(makeStringResponse(v, 200));
-            } else if (p1 == "Devices") {
-                try {
-                    std::string v = "[";
-                    RtMidiIn *mi = new RtMidiIn();
-                    if (mi != nullptr) {
-                        unsigned int nPorts = mi->getPortCount();
-                        for (int x = 0; x < nPorts; x++) {
-                            std::string portName = mi->getPortName(x);
-                            if (v.size() != 1) {
-                                v += ", ";
-                            }
-                            v += "\"" + portName + "\"";
-                        }
-                        delete mi;
-                    }
-                    v += "]";
-                    callback(makeStringResponse(v, 200, "application/json"));
-                } catch (...) {
-                    LogErr(VB_PLUGIN, "Could not initialize MIDI plugin for port %s\n", name.c_str());
-                    callback(makeStringResponse("Error", 500));
-                }
-            } else {
-                callback(makeStringResponse("Not Found", 404));
-            }
-        };
 
-        drogon::app().registerHandler("/MIDI/Last", handleMidi, {drogon::Get});
-        drogon::app().registerHandler("/MIDI/Devices", handleMidi, {drogon::Get});
-        drogon::app().registerHandler("/api/plugin-apis/MIDI/Last", handleMidi, {drogon::Get});
-        drogon::app().registerHandler("/api/plugin-apis/MIDI/Devices", handleMidi, {drogon::Get});
+    void registerApis() override {
+        drogon::app().registerHandler("/MIDI/Last", [this](const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) { handleMidi(req, std::move(callback)); }, {drogon::Get});
+        drogon::app().registerHandler("/MIDI/Devices", [this](const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) { handleMidi(req, std::move(callback)); }, {drogon::Get});
+        drogon::app().registerHandler("/api/plugin-apis/MIDI/Last", [this](const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) { handleMidi(req, std::move(callback)); }, {drogon::Get});
+        drogon::app().registerHandler("/api/plugin-apis/MIDI/Devices", [this](const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) { handleMidi(req, std::move(callback)); }, {drogon::Get});
+    }
+
+    void addControlCallbacks(std::map<int, std::function<bool(int)>>& callbacks) override {
+        callbacks[eventFileRead] = [this](int fd) {
+            return ProcessPacket(fd);
+        };
     }
 
     bool ProcessPacket(int i) {
@@ -410,10 +489,12 @@ public:
             auto midi = incoming.front();
             incoming.pop_front();
             lock.unlock();
+            std::unique_lock<std::mutex> elock(lastEventsLock);
             lastEvents.push_back(midi);
             if (lastEvents.size() > 25) {
                 lastEvents.pop_front();
             }
+            elock.unlock();
             for (auto &a : events) {
                 if (a->matches(midi)) {
                     a->invoke(midi);
@@ -426,7 +507,7 @@ public:
 };
 
 extern "C" {
-    FPPPlugin *createPlugin() {
+    FPPPlugins::Plugin *createPlugin() {
         return new FPPMIDIPlugin();
     }
 }
