@@ -19,6 +19,7 @@
 #include <mutex>
 #include "Plugin.h"
 #include "commands/Commands.h"
+#include "fpphttp.h"
 #include <rtmidi/RtMidi.h>
 #include "log.h"
 #include "util/ExpressionProcessor.cpp"
