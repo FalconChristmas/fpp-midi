@@ -465,10 +465,11 @@ public:
 
 
     void registerApis() override {
+        // Only the plain paths are needed: Apache rewrites api/plugin-apis/MIDI/*
+        // to localhost:32322/MIDI/*, stripping the plugin-apis/ prefix, so
+        // "/api/plugin-apis/MIDI/*" routes would never be reached.
         drogon::app().registerHandler("/MIDI/Last", [this](const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) { handleMidi(req, std::move(callback)); }, {drogon::Get});
         drogon::app().registerHandler("/MIDI/Devices", [this](const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) { handleMidi(req, std::move(callback)); }, {drogon::Get});
-        drogon::app().registerHandler("/api/plugin-apis/MIDI/Last", [this](const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) { handleMidi(req, std::move(callback)); }, {drogon::Get});
-        drogon::app().registerHandler("/api/plugin-apis/MIDI/Devices", [this](const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) { handleMidi(req, std::move(callback)); }, {drogon::Get});
     }
 
     void addControlCallbacks(std::map<int, std::function<bool(int)>>& callbacks) override {
