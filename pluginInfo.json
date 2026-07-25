@@ -6,6 +6,7 @@
     "homeURL": "https://github.com/FalconChristmas/fpp-midi",
     "srcURL": "https://github.com/FalconChristmas/fpp-midi.git",
     "bugURL": "https://github.com/FalconChristmas/fpp-midi/issues",
+    "iconURL": "https://raw.githubusercontent.com/FalconChristmas/fpp-midi/master/icon.png",
     "versions": [
         {
             "minFPPVersion": "4.0",
