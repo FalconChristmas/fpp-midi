@@ -1,5 +1,4 @@
 #include <fpp-pch.h>
-#include <drogon/HttpAppFramework.h>
 
 #include <unistd.h>
 #include <ifaddrs.h>
@@ -397,9 +396,24 @@ public:
         }
     }
 
+    // Stop MIDI input before anything else. RtMidi delivers on its own thread,
+    // straight into midicallback() in this library, so a port left open is a
+    // call into the plugin while it is being destroyed - and after the library
+    // is unmapped, a call into nothing. cancelCallback() unhooks
+    // midicallback(); closePort() stops and joins RtMidi's input thread. Both
+    // have returned by the time this does, so no readiness predicate is needed
+    // and the destructor below is left to do the actual freeing.
+    virtual std::function<bool()> shutdown() override {
+        for (auto a : midiin) {
+            a->cancelCallback();
+            a->closePort();
+        }
+        return nullptr;
+    }
+
     virtual ~FPPMIDIPlugin() {
         for (auto a : midiin) {
-            a->closePort();
+            a->closePort(); // no-op if shutdown() already did it
             delete a;
         }
         for (auto e : events) {
@@ -464,12 +478,24 @@ public:
     }
 
 
+    void unregisterApis() override {
+        // Neither returns until no request is inside the handler and the
+        // handler itself - this plugin's code - has been destroyed, which is
+        // what makes a later dlclose() safe.
+        FPPPlugins::unregisterPluginApi("/MIDI/Last");
+        FPPPlugins::unregisterPluginApi("/MIDI/Devices");
+    }
+
     void registerApis() override {
         // Only the plain paths are needed: Apache rewrites api/plugin-apis/MIDI/*
         // to localhost:32322/MIDI/*, stripping the plugin-apis/ prefix, so
         // "/api/plugin-apis/MIDI/*" routes would never be reached.
-        drogon::app().registerHandler("/MIDI/Last", [this](const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) { handleMidi(req, std::move(callback)); }, {drogon::Get});
-        drogon::app().registerHandler("/MIDI/Devices", [this](const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) { handleMidi(req, std::move(callback)); }, {drogon::Get});
+        //
+        // Registered through FPP rather than drogon::app() directly: drogon has
+        // no route removal, so a handler registered straight with it could never
+        // be withdrawn and would pin this plugin in memory for the life of fppd.
+        FPPPlugins::registerPluginApi("/MIDI/Last", [this](const HttpRequestPtr& req, HttpCallback&& callback) { handleMidi(req, std::move(callback)); }, {drogon::Get});
+        FPPPlugins::registerPluginApi("/MIDI/Devices", [this](const HttpRequestPtr& req, HttpCallback&& callback) { handleMidi(req, std::move(callback)); }, {drogon::Get});
     }
 
     void addControlCallbacks(std::map<int, std::function<bool(int)>>& callbacks) override {
@@ -507,6 +533,15 @@ public:
         return false;
     }
 };
+
+// Safe to dlclose() on unload: the only threads are RtMidi's input threads, and
+// shutdown() unhooks the callback and closes each port, which stops and joins
+// them. No timers, no CurlManager requests, no commands and no drogon client
+// objects. The routes go through registerPluginApi() and come back in
+// unregisterApis(); FPP withdraws the eventfd from its epoll loop, and the
+// descriptors and MIDI objects are freed in the destructor, which runs before
+// the library is unmapped.
+FPP_PLUGIN_SUPPORTS_UNLOAD()
 
 extern "C" {
     FPPPlugins::Plugin *createPlugin() {
