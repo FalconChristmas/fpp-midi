@@ -1,0 +1,50 @@
+{
+    "paths": {
+        "/MIDI/Last": {
+            "get": {
+                "summary": "Recently received MIDI messages",
+                "description": "The last few MIDI messages the plugin has seen, as raw hex bytes, most recent last. Intended for working out what a controller sends while setting up an event mapping.",
+                "responses": {
+                    "200": {
+                        "description": "Recent messages",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "example": [
+                                    "0x90 0x3C 0x64",
+                                    "0x80 0x3C 0x00"
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/MIDI/Devices": {
+            "get": {
+                "summary": "Available MIDI input devices",
+                "description": "The MIDI input ports visible to the player, for choosing which to listen on.",
+                "responses": {
+                    "200": {
+                        "description": "Device names",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
