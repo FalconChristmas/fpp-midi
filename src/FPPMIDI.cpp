@@ -19,6 +19,7 @@
 #include "Plugin.h"
 #include "commands/Commands.h"
 #include "fpphttp.h"
+#include "FileMonitor.h"
 #include <rtmidi/RtMidi.h>
 #include "log.h"
 #include "util/ExpressionProcessor.cpp"
@@ -354,6 +355,22 @@ public:
         fcntl(eventFileRead, F_SETFD, O_NONBLOCK);
         fcntl(eventFileWrite, F_SETFD, O_NONBLOCK);
 #endif
+        // This plugin's configuration is its own JSON file rather than the
+        // key=value settings file FPPPlugins::Plugin watches, so the
+        // monitorSettings constructor argument would not see it. Watch it
+        // directly, so editing the event map takes effect without restarting
+        // fppd. shutdown() gives the watch back - the callback lives here.
+        //
+        // Only the events are reloaded. The "ports" list decides which MIDI
+        // devices are open, and reopening those means stopping and restarting
+        // RtMidi's input threads; that is a heavier operation than swapping a
+        // lookup table and is deliberately still left to a restart.
+        std::function<void()> reload = [this]() {
+            LogInfo(VB_PLUGIN, "MIDI: event map changed, reloading\n");
+            loadEvents();
+        };
+        FileMonitor::INSTANCE.AddFile(name, FPP_DIR_CONFIG("/plugin.fpp-midi.json"), reload);
+
         if (FileExists(FPP_DIR_CONFIG("/plugin.fpp-midi.json"))) {
             Json::Value root;
             bool success =  LoadJsonFromFile(FPP_DIR_CONFIG("/plugin.fpp-midi.json"), root);
@@ -404,11 +421,30 @@ public:
     // have returned by the time this does, so no readiness predicate is needed
     // and the destructor below is left to do the actual freeing.
     virtual std::function<bool()> shutdown() override {
+        FileMonitor::INSTANCE.RemoveFile(name, FPP_DIR_CONFIG("/plugin.fpp-midi.json"));
         for (auto a : midiin) {
             a->cancelCallback();
             a->closePort();
         }
         return nullptr;
+    }
+
+    // Swap the event map for what is on disk now. The incoming-packet path
+    // walks 'events' from the main loop (ProcessPacket, via the eventfd), which
+    // is where this runs too, so nothing can be mid-iteration.
+    void loadEvents() {
+        for (auto e : events) {
+            delete e;
+        }
+        events.clear();
+        if (FileExists(FPP_DIR_CONFIG("/plugin.fpp-midi.json"))) {
+            Json::Value root;
+            if (LoadJsonFromFile(FPP_DIR_CONFIG("/plugin.fpp-midi.json"), root) && root.isMember("events")) {
+                for (int x = 0; x < root["events"].size(); x++) {
+                    events.push_back(new MIDIEvent(root["events"][x]));
+                }
+            }
+        }
     }
 
     virtual ~FPPMIDIPlugin() {
