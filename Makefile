@@ -8,7 +8,7 @@ debug: all
 CFLAGS+=-I.
 OBJECTS_fpp_midi_so += src/FPPMIDI.o
 LIBS_fpp_midi_so += -L$(SRCDIR) -lfpp -ljsoncpp -ldrogon -ltrantor -lrtmidi
-CXXFLAGS_src/FPPOSC.o += -I$(SRCDIR)
+CXXFLAGS_src/FPPMIDI.o += -I$(SRCDIR)
 
 
 ifeq '$(ARCH)' 'OSX'
@@ -18,7 +18,7 @@ $(MIDIHEADER):
 else
 MIDIHEADER=/usr/include/rtmidi/RtMidi.h
 $(MIDIHEADER):
-	sudo ./install_librtmidi.sh
+	./install_librtmidi.sh
 endif
 
 %.o: %.cpp Makefile $(MIDIHEADER)

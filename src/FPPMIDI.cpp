@@ -56,7 +56,7 @@ public:
         std::string v;
         for (auto a : params) {
             char buf[10];
-            sprintf(buf, "0x%02X", a);
+            snprintf(buf, sizeof(buf), "0x%02X", a);
             if (!v.empty()) {
                 v += " ";
             }
