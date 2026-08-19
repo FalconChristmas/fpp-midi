@@ -25,7 +25,7 @@ endif
 	$(CCACHE) $(CC) $(CFLAGS) $(CXXFLAGS) $(CXXFLAGS_$@) -c $< -o $@
 
 %.o: %.c Makefile
-	$(CCACHE) gcc $(CFLAGS)  -c $< -o $@
+	$(CCACHE) $(CCOMPILER) $(CFLAGS)  -c $< -o $@
 
 libfpp-midi.$(SHLIB_EXT): $(OBJECTS_fpp_midi_so) $(SRCDIR)/libfpp.$(SHLIB_EXT)
 	$(CCACHE) $(CC) -shared $(CFLAGS_$@) $(OBJECTS_fpp_midi_so) $(LIBS_fpp_midi_so) $(LDFLAGS) -o $@

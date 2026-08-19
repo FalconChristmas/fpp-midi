@@ -13,10 +13,13 @@
 #include <sstream>
 #ifndef PLATFORM_OSX
 #include <sys/eventfd.h>
+#include <fcntl.h>
 #endif
 #include <cmath>
 #include <mutex>
 #include "Plugin.h"
+#include "common.h"
+#include "settings.h"
 #include "commands/Commands.h"
 #include "fpphttp.h"
 #include "FileMonitor.h"
