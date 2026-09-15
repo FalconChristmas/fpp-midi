@@ -42,5 +42,27 @@
             "sha": "",
             "allowUpdates": 1
         }
-    ]
+    ],
+    "privacy": {
+        "summary": "Runs on this device; installs and pins a modified rtmidi system package that stays after uninstall. A mapped command can be sent to other FPP players you pick, or to every player on your network.",
+        "sends": [
+            {
+                "to": "the FPP players you pick in a command, or every FPP player on your network",
+                "what": "the FPP command you mapped to a MIDI message",
+                "why": "to run that command on other players in your show",
+                "alwaysOn": false
+            }
+        ],
+        "collects": [],
+        "sensors": [],
+        "remoteAccess": "none",
+        "systemChanges": [
+            {
+                "kind": "download",
+                "what": "installs librtmidi and a repackaged, apt-held librtmidi-dev with apt at install or when the plugin is rebuilt"
+            }
+        ],
+        "closedCode": false,
+        "other": "The last 25 MIDI messages received are held in memory only, for the setup page, and are gone when fppd restarts. The librtmidi packages and the apt hold on librtmidi-dev stay after uninstall, as does the plugin.fpp-midi.json config file."
+    }
 }
