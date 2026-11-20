@@ -14,8 +14,8 @@ playlists, set overlay model colours, adjust volume, or run any other FPP Comman
   actions (e.g. respond to note-on but not note-off).
 - Expression support, so a command argument can be computed from the MIDI message — for example
   scaling key velocity into a colour.
-- A "Last Messages" panel showing the most recent 25 messages FPPD received, to help work out which
-  bytes to match on.
+- A "Last Messages" panel showing the most recent 25 messages FPPD received as decimal bytes under
+  labelled `B1`–`B5` column headers, to help work out which bytes to match on.
 
 ## Installation
 
@@ -62,6 +62,8 @@ For example, a red that scales with how hard the key was struck:
 ```
 =rgb(velocity*2,0,0)
 ```
+
+Variable names are case-insensitive — `B3` and `VELOCITY` work just as well as `b3` and `velocity`.
 
 Expression evaluation uses the [TinyExpr](https://github.com/codeplea/tinyexpr) library.
 

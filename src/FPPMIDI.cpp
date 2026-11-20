@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #endif
 #include <cmath>
+#include <cctype>
 #include <mutex>
 #include "Plugin.h"
 #include "common.h"
@@ -55,15 +56,33 @@ class MIDIInputEvent {
 public:
     MIDIInputEvent(const std::vector<unsigned char> &m) : params(m) {
     }
-    std::string toString() {
+    // Fixed-width decimal columns, one for each possible MIDI byte, so the
+    // Last Messages panel can show a matching header row. Bytes that were not
+    // present in the message are blank rather than 0 - a real 0 byte is common
+    // (note-off velocity) and should be distinguishable from "not sent".
+    std::string toString() const {
+        static const size_t NUM_COLUMNS = 5;
         std::string v;
-        for (auto a : params) {
-            char buf[10];
-            snprintf(buf, sizeof(buf), "0x%02X", a);
-            if (!v.empty()) {
+        char buf[8];
+        for (size_t i = 0; i < NUM_COLUMNS; ++i) {
+            if (i < params.size()) {
+                snprintf(buf, sizeof(buf), "%3u", static_cast<unsigned int>(params[i]));
+            } else {
+                snprintf(buf, sizeof(buf), "%3s", "");
+            }
+            if (i != 0) {
                 v += " ";
             }
             v += buf;
+        }
+        // SysEx and other long messages still need to be visible. Anything
+        // beyond the labelled columns goes after a separator, in decimal.
+        if (params.size() > NUM_COLUMNS) {
+            v += " |";
+            for (size_t i = NUM_COLUMNS; i < params.size(); ++i) {
+                snprintf(buf, sizeof(buf), " %u", static_cast<unsigned int>(params[i]));
+                v += buf;
+            }
         }
         return v;
     }
@@ -72,6 +91,11 @@ public:
 };
 
 namespace {
+
+// Column labels for the Last Messages panel. Kept here so the header and the
+// values from MIDIInputEvent::toString() use the same three-character columns
+// separated by a single space.
+const char* const LAST_MESSAGES_HEADER = " B1  B2  B3  B4  B5";
 
 std::string getMidiPath(const HttpRequestPtr& req) {
     std::vector<std::string> pieces = getPathPieces(req->path());
@@ -188,19 +212,56 @@ public:
 
 class MIDICommandArg {
 public:
-    MIDICommandArg(const std::string &t) : arg(t) {
+    MIDICommandArg(const std::string &t) : arg(t), expression(t) {
+        // TinyExpr only starts identifiers on a lowercase letter, so "=B3/127"
+        // would fail to compile and evaluate to an empty string. Fold math
+        // expressions to lowercase so variables are effectively case
+        // insensitive. Plain strings, including %%name%% substitutions, keep
+        // the case the user typed.
+        if (isExpression()) {
+            for (char &c : expression) {
+                c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+            }
+        } else {
+            // Apply the same rule to %%name%% substitutions, but leave the
+            // literal text around them alone: "Matrix-%%B1%%" must stay
+            // "Matrix-" with only the name folded to "b1".
+            size_t pos = 0;
+            while ((pos = expression.find("%%", pos)) != std::string::npos) {
+                size_t end = expression.find("%%", pos + 2);
+                if (end == std::string::npos) {
+                    break;
+                }
+                for (size_t i = pos + 2; i < end; ++i) {
+                    expression[i] = static_cast<char>(tolower(static_cast<unsigned char>(expression[i])));
+                }
+                pos = end + 2;
+            }
+        }
     }
     ~MIDICommandArg() {
         if (processor) {
             delete processor;
         }
     }
-    
-    std::string arg;
+
+    // Same form ExpressionProcessor treats as a math expression: a single
+    // leading '=' (not '==' or '%%').
+    bool isExpression() const {
+        return expression.size() > 1 && expression[0] == '=' && expression[1] != '=';
+    }
+
+    std::string arg;        // as configured, kept for log messages
+    std::string expression; // what is actually compiled
     std::string type;
-    
+
+    // A malformed formula evaluates to "" on every FPP version; see the probe
+    // in MIDIEvent's constructor. When false, invoke() substitutes a safe
+    // value instead of passing an empty string to a numeric command argument.
+    bool valid = true;
+
     ExpressionProcessor *processor = nullptr;
-    
+
     std::string evaluate(const std::string &tp) {
         if (processor) {
             std::string s = processor->evaluate(tp);
@@ -246,8 +307,22 @@ public:
                 a.processor->bindVariable(var);
             }
         }
+        // Defined values before probing the expressions below; invoke() sets
+        // the real values for every message.
+        for (int x = 0; x < NUM_VARS; x++) {
+            variables[x]->setValue("0");
+        }
         for (auto &a : args) {
-            a.processor->compile(a.arg);
+            a.processor->compile(a.expression);
+            if (a.isExpression() && a.processor->evaluate("string").empty()) {
+                // te_compile() failure yields an empty evaluation on both old
+                // and new FPP versions (older compile() even returns false
+                // unconditionally), so this is a portable way to detect a bad
+                // formula. Report it once here rather than at invoke time.
+                a.valid = false;
+                LogWarn(VB_PLUGIN, "MIDI: invalid expression '%s' - this argument will use 0\n",
+                        a.arg.c_str());
+            }
         }
     }
     ~MIDIEvent() {
@@ -311,6 +386,13 @@ public:
                 tp = a.type;
             }
             
+            if (!a.valid) {
+                // Preserve the argument count, but never hand an empty string
+                // to a command expecting a number - that is what made a typo
+                // such as "=B3/127*100" take down fppd on older releases.
+                newCommand["args"].append(tp == "string" ? "" : "0");
+                continue;
+            }
             //printf("Eval p: %s\n", a.arg.c_str());
             std::string r = a.evaluate(tp);
             //printf("        -> %s\n", r.c_str());
@@ -484,7 +566,7 @@ public:
                     std::function<void(const HttpResponsePtr&)>&& callback) {
         std::string p1 = getMidiPath(req);
         if (p1 == "Last") {
-            std::string v;
+            std::string v = std::string(LAST_MESSAGES_HEADER) + "\n";
             std::unique_lock<std::mutex> lock(lastEventsLock);
             for (auto &a : lastEvents) {
                 v += a.toString() + "\n";

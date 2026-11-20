@@ -21,7 +21,7 @@ If the parameter starts with a single equal sign, it will be evaluated as a simp
     <li>channel_var - alias of channel</li>
     <li>velocity_var - alias of velocity</li>
 </ul>
-For example, the formula above can be written as "=rgb(velocity*2,0,0)".
+For example, the formula above can be written as "=rgb(velocity*2,0,0)".  Variable names are case insensitive, so "=B3/127*100" works the same as "=b3/127*100".
 <p>
 If the parameter does not start with a single =, it is treated as a string, but parameters can be substituted in by using %%name%% in the string (for example %%b1%%, %%note%%, or %%velocity%%).  For example: "Matrix-%%b1%%".
 <p>
@@ -36,4 +36,4 @@ If the parameter does not start with a single =, it is treated as a string, but 
 </li>
 </ol>
 <p>
-The "Last Messages" section in the upper right displays the last 25 messages that FPPD has received.  Clicking Refresh will refresh the list.  These can be used to help identify which parameters are being used to help define conditions.
+The "Last Messages" section in the upper right displays the last 25 messages that FPPD has received as decimal values, with the B1 through B5 columns labelled at the top.  A blank column means that message did not contain that byte; longer messages (such as SysEx) show any bytes after B5 following a "|" separator.  Clicking Refresh will refresh the list.  These can be used to help identify which parameters are being used to help define conditions.
