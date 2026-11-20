@@ -3,22 +3,16 @@
         "/MIDI/Last": {
             "get": {
                 "summary": "Recently received MIDI messages",
-                "description": "The last few MIDI messages the plugin has seen, as raw hex bytes, most recent last. Intended for working out what a controller sends while setting up an event mapping.",
+                "description": "The last few MIDI messages the plugin has seen, most recent last, as decimal bytes in fixed-width B1-B5 columns. The first line labels the columns; bytes absent from a message are left blank. Intended for working out what a controller sends while setting up an event mapping.",
                 "responses": {
                     "200": {
                         "description": "Recent messages",
                         "content": {
-                            "application/json": {
+                            "text/plain": {
                                 "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string"
-                                    }
+                                    "type": "string"
                                 },
-                                "example": [
-                                    "0x90 0x3C 0x64",
-                                    "0x80 0x3C 0x00"
-                                ]
+                                "example": " B1  B2  B3  B4  B5\n144  60 100            \n128  60   0            "
                             }
                         }
                     }

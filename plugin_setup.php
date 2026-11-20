@@ -288,7 +288,7 @@ $(document).ready(function() {
             </div>
             <div class="row">
                 <div class="col">
-                    <pre id="lastMessages" style='min-width:150px; margin:1px;min-height:300px;'></pre>
+                    <pre id="lastMessages" style='min-width:180px; margin:1px;min-height:300px;'></pre>
                 </div>
             </div>
         </div>
